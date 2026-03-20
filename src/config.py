@@ -20,6 +20,8 @@ class AppConfig:
     refresh_interval: float = 1
     window_width: int = 1200
     window_height: int = 800
+    cpu_alert_threshold: int = 90
+    mem_alert_threshold: int = 90
 
     # ------------------------------------------------------------------
     # Persistence
@@ -44,6 +46,10 @@ class AppConfig:
                 cfg.theme = "dark"
             if cfg.refresh_interval not in _VALID_INTERVALS:
                 cfg.refresh_interval = 1
+            if not (50 <= cfg.cpu_alert_threshold <= 99):
+                cfg.cpu_alert_threshold = 90
+            if not (50 <= cfg.mem_alert_threshold <= 99):
+                cfg.mem_alert_threshold = 90
             return cfg
         except Exception:
             return cls()
