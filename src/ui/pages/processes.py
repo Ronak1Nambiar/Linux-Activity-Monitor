@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import os
+import signal
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QMessageBox,
     QPushButton,
     QVBoxLayout,
     QWidget,
@@ -83,22 +87,29 @@ class ProcessesPage(QWidget):
         pid = self._table.get_selected_pid()
         if pid is None:
             return
-        from PySide6.QtWidgets import QMessageBox
 
         reply = QMessageBox.question(
             self,
             "Kill Process",
-            f"Send SIGTERM to process {pid}?",
+            f"Are you sure you want to kill process {pid}?\n\nThis will send SIGTERM.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
         )
         if reply == QMessageBox.StandardButton.Yes:
-            import os
-            import signal
-
             try:
                 os.kill(pid, signal.SIGTERM)
-            except (ProcessLookupError, PermissionError) as e:
-                QMessageBox.warning(self, "Error", f"Could not kill process {pid}:\n{e}")
+            except ProcessLookupError:
+                QMessageBox.warning(
+                    self,
+                    "Process Not Found",
+                    f"Process {pid} no longer exists.",
+                )
+            except PermissionError:
+                QMessageBox.critical(
+                    self,
+                    "Permission Denied",
+                    f"Insufficient privileges to kill process {pid}.",
+                )
 
     def update_processes(self, processes: list[dict]) -> None:
         self._table.update_processes(processes)
