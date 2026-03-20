@@ -1,6 +1,7 @@
 """Background thread that collects all real-time system metrics each second."""
 
 import os
+import subprocess
 import time
 
 import psutil
@@ -52,6 +53,7 @@ class SystemCollector(BaseCollector):
         data["network"] = self._get_network(now)
         data["sensors"] = self._get_sensors()
         data["uptime_seconds"] = self._get_uptime()
+        data["gpu"] = self._get_gpu()
 
         self._prev_time = now
         self.data_ready.emit(data)
@@ -94,6 +96,9 @@ class SystemCollector(BaseCollector):
                 "used": vm.used,
                 "available": vm.available,
                 "percent": vm.percent,
+                "cached": getattr(vm, "cached", 0),
+                "buffers": getattr(vm, "buffers", 0),
+                "shared": getattr(vm, "shared", 0),
                 "swap_total": swap.total,
                 "swap_used": swap.used,
                 "swap_percent": swap.percent,
@@ -237,6 +242,78 @@ class SystemCollector(BaseCollector):
             pass
 
         return sensors
+
+    def _get_gpu(self) -> list:
+        # Try NVIDIA first
+        try:
+            result = subprocess.run(
+                [
+                    "nvidia-smi",
+                    "--query-gpu=name,utilization.gpu,memory.used,memory.total,temperature.gpu",
+                    "--format=csv,noheader,nounits",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=3,
+            )
+            if result.returncode == 0:
+                gpus = []
+                for line in result.stdout.strip().splitlines():
+                    line = line.strip()
+                    if not line:
+                        continue
+                    parts = [p.strip() for p in line.split(",")]
+                    if len(parts) >= 5:
+                        try:
+                            gpus.append({
+                                "name": parts[0],
+                                "load_pct": float(parts[1]),
+                                "mem_used_mb": int(parts[2]),
+                                "mem_total_mb": int(parts[3]),
+                                "temp_c": float(parts[4]),
+                            })
+                        except Exception:
+                            pass
+                if gpus:
+                    return gpus
+        except Exception:
+            pass
+
+        # Try AMD
+        try:
+            result = subprocess.run(
+                ["rocm-smi", "--showallinfo", "--json"],
+                capture_output=True,
+                text=True,
+                timeout=3,
+            )
+            if result.returncode == 0:
+                import json as _json
+                amd_data = _json.loads(result.stdout)
+                gpus = []
+                for card_key, card_val in amd_data.items():
+                    if not isinstance(card_val, dict):
+                        continue
+                    name = card_val.get("Card series", card_key)
+                    load_str = card_val.get("GPU use (%)", "0")
+                    mem_used_str = card_val.get("GPU memory use (%)", "0")
+                    temp_str = card_val.get("Temperature (Sensor edge) (°C)", "0")
+                    try:
+                        gpus.append({
+                            "name": name,
+                            "load_pct": float(str(load_str).strip().rstrip("%")),
+                            "mem_used_mb": 0,
+                            "mem_total_mb": 0,
+                            "temp_c": float(str(temp_str).strip()),
+                        })
+                    except Exception:
+                        pass
+                if gpus:
+                    return gpus
+        except Exception:
+            pass
+
+        return []
 
     def _get_uptime(self) -> float:
         try:

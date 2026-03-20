@@ -146,8 +146,22 @@ class ProcessesPage(QWidget):
 
             try:
                 os.kill(pid, signal.SIGTERM)
-            except (ProcessLookupError, PermissionError) as e:
-                QMessageBox.warning(self, "Error", f"Could not kill process {pid}:\n{e}")
+            except PermissionError:
+                QMessageBox.warning(
+                    self,
+                    "Permission Denied",
+                    f"Cannot terminate process {pid}.\n\n"
+                    "This process is owned by another user (e.g. root). "
+                    "You need elevated privileges (sudo) to kill it.",
+                )
+            except ProcessLookupError:
+                QMessageBox.information(
+                    self,
+                    "Process Not Found",
+                    f"Process {pid} no longer exists — it may have already exited.",
+                )
+            except OSError as e:
+                QMessageBox.warning(self, "Error", f"Could not terminate process {pid}:\n{e}")
 
     def update_processes(self, processes: list[dict]) -> None:
         self._table.update_processes(processes)

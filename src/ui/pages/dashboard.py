@@ -134,6 +134,10 @@ class DashboardPage(QWidget):
         self._cpu_core_widget = _PerCoreWidget()
         self._cpu_card.add_widget(self._cpu_core_widget)
         self._ram_card = self._make_gauge_card("Memory")
+        self._ram_breakdown_label = QLabel("")
+        self._ram_breakdown_label.setObjectName("HintLabel")
+        self._ram_breakdown_label.setWordWrap(True)
+        self._ram_card.add_widget(self._ram_breakdown_label)
         self._disk_card = self._make_disk_card()
         self._net_card = self._make_net_card()
 
@@ -142,6 +146,14 @@ class DashboardPage(QWidget):
         top_grid.addWidget(self._disk_card, 0, 2)
         top_grid.addWidget(self._net_card, 0, 3)
         layout.addLayout(top_grid)
+
+        # --- GPU row (hidden until GPU data arrives) ---
+        self._gpu_card = self._make_gpu_card()
+        self._gpu_card.setVisible(False)
+        gpu_row = QHBoxLayout()
+        gpu_row.addWidget(self._gpu_card)
+        gpu_row.addStretch()
+        layout.addLayout(gpu_row)
 
         # --- Bottom row: Temperatures / Battery / Uptime ---
         bot_grid = QGridLayout()
@@ -255,6 +267,26 @@ class DashboardPage(QWidget):
         card._down_chart = down_chart  # type: ignore[attr-defined]
         return card
 
+    def _make_gpu_card(self) -> MetricCard:
+        card = MetricCard("GPU")
+        card.setMinimumHeight(160)
+        card.setMaximumWidth(320)
+
+        gauge = CircularGauge()
+        gauge.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        gauge.setFixedHeight(120)
+        gauge.set_label("GPU")
+
+        chart = MiniChart(max_value=100, color="#fb923c")
+        chart.setFixedHeight(40)
+
+        card.add_widget(gauge)
+        card.add_widget(chart)
+
+        card._gauge = gauge  # type: ignore[attr-defined]
+        card._chart = chart  # type: ignore[attr-defined]
+        return card
+
     def _make_temp_card(self) -> MetricCard:
         card = MetricCard("Temperatures")
         card.setMinimumHeight(150)
@@ -313,6 +345,29 @@ class DashboardPage(QWidget):
     # Live update
     # ------------------------------------------------------------------
 
+    # ------------------------------------------------------------------
+    # Card visibility (dashboard customization)
+    # ------------------------------------------------------------------
+
+    _CARD_MAP = {
+        "cpu": "_cpu_card",
+        "memory": "_ram_card",
+        "disk": "_disk_card",
+        "network": "_net_card",
+        "temperatures": "_temp_card",
+        "battery": "_battery_card",
+        "system": "_uptime_card",
+        # gpu card visibility is managed separately (only shown when GPU detected)
+    }
+
+    def apply_visibility(self, hidden_cards: list) -> None:
+        """Show or hide dashboard cards based on user preferences."""
+        hidden = set(hidden_cards)
+        for key, attr in self._CARD_MAP.items():
+            card = getattr(self, attr, None)
+            if card:
+                card.setVisible(key not in hidden)
+
     def update_data(self, data: dict) -> None:
         self._update_cpu(data.get("cpu", {}))
         self._update_memory(data.get("memory", {}))
@@ -324,6 +379,7 @@ class DashboardPage(QWidget):
             data.get("memory", {}),
             data.get("cpu", {}),
         )
+        self._update_gpu(data.get("gpu", []))
 
     def _update_cpu(self, cpu: dict) -> None:
         pct = cpu.get("percent", 0.0)
@@ -357,6 +413,19 @@ class DashboardPage(QWidget):
             self._ram_card.set_sub_value(
                 f"of {bytes_to_human(total)}  —  {bytes_to_human(available)} free"
             )
+        # Memory breakdown
+        cached = mem.get("cached", 0)
+        buffers = mem.get("buffers", 0)
+        shared = mem.get("shared", 0)
+        parts = []
+        if cached:
+            parts.append(f"cached {bytes_to_human(cached)}")
+        if buffers:
+            parts.append(f"buffers {bytes_to_human(buffers)}")
+        if shared:
+            parts.append(f"shared {bytes_to_human(shared)}")
+        if parts:
+            self._ram_breakdown_label.setText("  ·  ".join(parts))
 
     def _update_disk(self, disk: dict) -> None:
         partitions = disk.get("partitions", [])
@@ -426,6 +495,27 @@ class DashboardPage(QWidget):
         else:
             self._battery_card.set_value("N/A")
             self._battery_card._status_label.setText("No battery detected")
+
+    def _update_gpu(self, gpus: list) -> None:
+        if not gpus:
+            return
+        gpu = gpus[0]
+        load = gpu.get("load_pct", 0.0)
+        mem_used = gpu.get("mem_used_mb", 0)
+        mem_total = gpu.get("mem_total_mb", 0)
+        temp = gpu.get("temp_c", None)
+        self._gpu_card.setVisible(True)
+        self._gpu_card._gauge.set_value(load)
+        self._gpu_card._chart.set_color(color_for_percent(load))
+        self._gpu_card._chart.add_value(load)
+        self._gpu_card.set_value(f"{load:.0f}%")
+        name = gpu.get("name", "GPU")
+        sub_parts = [name]
+        if mem_total:
+            sub_parts.append(f"VRAM {mem_used}/{mem_total} MB")
+        if temp is not None:
+            sub_parts.append(f"{temp:.0f}°C")
+        self._gpu_card.set_sub_value("  ·  ".join(sub_parts))
 
     def _update_uptime(self, uptime_seconds: float, mem: dict, cpu: dict) -> None:
         self._uptime_card.set_value(format_uptime(uptime_seconds))

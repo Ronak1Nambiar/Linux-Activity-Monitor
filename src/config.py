@@ -22,6 +22,8 @@ class AppConfig:
     window_height: int = 800
     cpu_alert_threshold: int = 90
     mem_alert_threshold: int = 90
+    session_logging_enabled: bool = True
+    dashboard_hidden_cards: list = field(default_factory=list)
 
     # ------------------------------------------------------------------
     # Persistence

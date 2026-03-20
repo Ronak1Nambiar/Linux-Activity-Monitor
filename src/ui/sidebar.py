@@ -18,7 +18,10 @@ _NAV_ITEMS = [
     ("processes",  "Processes"),
     ("storage",    "Storage"),
     ("network",    "Network"),
+    ("history",    "History"),
     ("hardware",   "Hardware"),
+    ("alerts",     "Alerts"),
+    ("docker",     "Docker"),
 ]
 
 _NAV_ICONS = {
@@ -26,7 +29,10 @@ _NAV_ICONS = {
     "processes":  "☰ ",
     "storage":    "💾",
     "network":    "🌐",
+    "history":    "📈",
     "hardware":   "🖥 ",
+    "alerts":     "🔔",
+    "docker":     "🐳",
 }
 
 

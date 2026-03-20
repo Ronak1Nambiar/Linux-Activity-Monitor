@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QDialog,
     QDialogButtonBox,
@@ -81,6 +82,50 @@ class SettingsDialog(QDialog):
 
         layout.addLayout(alerts_form)
 
+        # ---- Logging section ----
+        logging_title = QLabel("Logging")
+        logging_title.setObjectName("PageTitle")
+        layout.addWidget(logging_title)
+
+        logging_form = QFormLayout()
+        logging_form.setSpacing(12)
+        logging_form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+
+        self._session_log_check = QCheckBox("Write metrics to session log file")
+        self._session_log_check.setChecked(self._config.session_logging_enabled)
+        logging_form.addRow("Session Logging:", self._session_log_check)
+        layout.addLayout(logging_form)
+
+        # ---- Dashboard customization section ----
+        dash_title = QLabel("Dashboard Cards")
+        dash_title.setObjectName("PageTitle")
+        layout.addWidget(dash_title)
+
+        dash_hint = QLabel("Uncheck cards to hide them from the dashboard.")
+        dash_hint.setObjectName("HintLabel")
+        layout.addWidget(dash_hint)
+
+        self._dash_card_checks: dict[str, QCheckBox] = {}
+        _card_labels = {
+            "cpu": "CPU",
+            "memory": "Memory",
+            "disk": "Disk",
+            "network": "Network",
+            "gpu": "GPU",
+            "temperatures": "Temperatures",
+            "battery": "Battery",
+            "system": "System / Uptime",
+        }
+        dash_form = QFormLayout()
+        dash_form.setSpacing(8)
+        hidden = set(self._config.dashboard_hidden_cards)
+        for key, label in _card_labels.items():
+            cb = QCheckBox(label)
+            cb.setChecked(key not in hidden)
+            self._dash_card_checks[key] = cb
+            dash_form.addRow("", cb)
+        layout.addLayout(dash_form)
+
         # Buttons
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
@@ -98,6 +143,10 @@ class SettingsDialog(QDialog):
         self._config.refresh_interval = interval
         self._config.cpu_alert_threshold = self._cpu_threshold_spin.value()
         self._config.mem_alert_threshold = self._mem_threshold_spin.value()
+        self._config.session_logging_enabled = self._session_log_check.isChecked()
+        self._config.dashboard_hidden_cards = [
+            key for key, cb in self._dash_card_checks.items() if not cb.isChecked()
+        ]
         self._config.save()
         self.settings_changed.emit(self._config)
         self.accept()

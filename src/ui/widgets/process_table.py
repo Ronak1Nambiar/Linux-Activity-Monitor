@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
 
 from src.utils.formatting import bytes_to_human
 
-_HEADERS = ["PID", "Name", "User", "CPU %", "CPU History", "RAM %", "RAM", "Status", "Threads"]
+_HEADERS = ["PID", "Name", "User", "CPU %", "CPU History", "RAM %", "RAM", "Disk Read", "Disk Write", "Status", "Threads"]
 _COL_PID = 0
 _COL_NAME = 1
 _COL_USER = 2
@@ -25,8 +25,10 @@ _COL_CPU = 3
 _COL_CPU_HIST = 4
 _COL_RAM_PCT = 5
 _COL_RAM = 6
-_COL_STATUS = 7
-_COL_THREADS = 8
+_COL_DISK_R = 7
+_COL_DISK_W = 8
+_COL_STATUS = 9
+_COL_THREADS = 10
 
 _HISTORY_LEN = 30
 
@@ -151,6 +153,8 @@ class ProcessTable(QTableView):
         self.setColumnWidth(_COL_CPU_HIST, 120)
         self.setColumnWidth(_COL_RAM_PCT, 70)
         self.setColumnWidth(_COL_RAM, 90)
+        self.setColumnWidth(_COL_DISK_R, 90)
+        self.setColumnWidth(_COL_DISK_W, 90)
         self.setColumnWidth(_COL_THREADS, 75)
 
         # Register sparkline delegate on CPU History column
@@ -259,11 +263,19 @@ class ProcessTable(QTableView):
             color = status_colors.get(status_str, "#9ca3b4")
             status_item.setForeground(QColor(color))
 
+            io_read = proc.get("io_read_bps", 0.0)
+            io_write = proc.get("io_write_bps", 0.0)
+            disk_r_item = _NumericItem(bytes_to_human(io_read) + "/s" if io_read >= 1 else "—", io_read)
+            disk_r_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            disk_w_item = _NumericItem(bytes_to_human(io_write) + "/s" if io_write >= 1 else "—", io_write)
+            disk_w_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+
             threads_item = _NumericItem(str(proc.get("threads", 0)), float(proc.get("threads", 0)))
             threads_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
 
             self._model.appendRow(
-                [pid_item, name_item, user_item, cpu_item, hist_item, ram_pct_item, ram_item, status_item, threads_item]
+                [pid_item, name_item, user_item, cpu_item, hist_item, ram_pct_item, ram_item,
+                 disk_r_item, disk_w_item, status_item, threads_item]
             )
 
         # Re-enable sorting and restore the previous sort indicator
