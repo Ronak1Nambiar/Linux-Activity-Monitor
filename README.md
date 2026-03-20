@@ -32,7 +32,7 @@ A modern, real-time Linux system monitor built with **PySide6** and **psutil**. 
 ## Installation
 
 ```bash
-git clone <repo>
+git clone https://github.com/Ronak1Nambiar/Linux-Activity-Monitor.git
 cd Linux-Activity-Monitor
 bash install.sh
 ```
