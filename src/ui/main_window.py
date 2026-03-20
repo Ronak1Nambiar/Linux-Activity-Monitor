@@ -127,7 +127,7 @@ class MainWindow(QMainWindow):
         self._sys_collector = SystemCollector(interval=self._config.refresh_interval)
         self._sys_collector.data_ready.connect(self._on_system_data)
 
-        self._proc_collector = ProcessCollector(interval=max(2, self._config.refresh_interval))
+        self._proc_collector = ProcessCollector(interval=max(2.0, self._config.refresh_interval))
         self._proc_collector.processes_ready.connect(self._on_process_data)
 
         self._sys_collector.start()

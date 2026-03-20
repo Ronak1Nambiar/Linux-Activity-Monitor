@@ -50,8 +50,8 @@ class SettingsDialog(QDialog):
 
         # Refresh interval
         self._interval_combo = QComboBox()
-        self._interval_combo.addItems(["1 second", "2 seconds", "5 seconds"])
-        idx = {1: 0, 2: 1, 5: 2}.get(self._config.refresh_interval, 0)
+        self._interval_combo.addItems(["0.5 seconds", "1 second", "2 seconds", "5 seconds"])
+        idx = {0.5: 0, 1: 1, 2: 2, 5: 3}.get(self._config.refresh_interval, 1)
         self._interval_combo.setCurrentIndex(idx)
         form.addRow("Refresh Interval:", self._interval_combo)
 
@@ -67,8 +67,8 @@ class SettingsDialog(QDialog):
 
     def _on_accept(self) -> None:
         theme = self._theme_combo.currentText().lower()
-        interval_map = {0: 1, 1: 2, 2: 5}
-        interval = interval_map.get(self._interval_combo.currentIndex(), 1)
+        interval_map = {0: 0.5, 1: 1.0, 2: 2.0, 3: 5.0}
+        interval = interval_map.get(self._interval_combo.currentIndex(), 1.0)
 
         self._config.theme = theme
         self._config.refresh_interval = interval
