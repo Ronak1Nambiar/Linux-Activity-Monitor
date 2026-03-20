@@ -27,6 +27,72 @@ from src.utils.formatting import (
 )
 
 
+class _PerCoreWidget(QWidget):
+    """Displays a compact grid of per-core CPU utilisation bars."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._bars: list[QProgressBar] = []
+        self._labels: list[QLabel] = []
+        self._layout = QGridLayout(self)
+        self._layout.setContentsMargins(0, 4, 0, 0)
+        self._layout.setSpacing(3)
+        self._core_count = 0
+
+    def update_cores(self, per_core: list[float]) -> None:
+        n = len(per_core)
+        # Rebuild grid if core count changed
+        if n != self._core_count:
+            self._core_count = n
+            # Clear old widgets
+            for bar in self._bars:
+                bar.deleteLater()
+            for lbl in self._labels:
+                lbl.deleteLater()
+            self._bars.clear()
+            self._labels.clear()
+            # Clear layout
+            while self._layout.count():
+                item = self._layout.takeAt(0)
+                if item.widget():
+                    item.widget().deleteLater()
+            # Create new bars — 2 columns: label | bar
+            cols = 2  # two label+bar pairs per row
+            for i in range(n):
+                row = i // cols
+                base_col = (i % cols) * 3  # 3 cells per core: label, bar, spacer
+
+                lbl = QLabel(f"{i}")
+                lbl.setObjectName("HintLabel")
+                lbl.setFixedWidth(16)
+                lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+
+                bar = QProgressBar()
+                bar.setRange(0, 100)
+                bar.setTextVisible(False)
+                bar.setFixedHeight(6)
+                bar.setFixedWidth(60)
+
+                self._layout.addWidget(lbl, row, base_col)
+                self._layout.addWidget(bar, row, base_col + 1)
+                self._bars.append(bar)
+                self._labels.append(lbl)
+
+        # Update values and colors
+        for i, (bar, val) in enumerate(zip(self._bars, per_core)):
+            bar.setValue(int(val))
+            if val >= 85:
+                color = "#f87171"
+            elif val >= 60:
+                color = "#fbbf24"
+            else:
+                color = "#4ade80"
+            bar.setStyleSheet(
+                f"QProgressBar {{ background: #252840; border-radius: 3px; }}"
+                f"QProgressBar::chunk {{ background: {color}; border-radius: 3px; }}"
+            )
+
+
 class DashboardPage(QWidget):
     """Displays live summary cards for all major metrics."""
 
@@ -65,6 +131,8 @@ class DashboardPage(QWidget):
         top_grid.setSpacing(16)
 
         self._cpu_card = self._make_gauge_card("CPU")
+        self._cpu_core_widget = _PerCoreWidget()
+        self._cpu_card.add_widget(self._cpu_core_widget)
         self._ram_card = self._make_gauge_card("Memory")
         self._disk_card = self._make_disk_card()
         self._net_card = self._make_net_card()
@@ -272,6 +340,9 @@ class DashboardPage(QWidget):
             )
         else:
             self._cpu_card.set_sub_value(f"{cores}C/{threads}T")
+        per_core = cpu.get("per_core", [])
+        if per_core:
+            self._cpu_core_widget.update_cores(per_core)
 
     def _update_memory(self, mem: dict) -> None:
         pct = mem.get("percent", 0.0)
