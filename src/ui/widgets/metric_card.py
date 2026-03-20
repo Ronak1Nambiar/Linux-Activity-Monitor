@@ -60,6 +60,16 @@ class MetricCard(QFrame):
         self.sub_label.setText(text)
         self.sub_label.setVisible(bool(text))
 
+    def set_description(self, text: str) -> None:
+        """Set a small description shown below the sub-value label."""
+        if not hasattr(self, "_desc_label"):
+            from PySide6.QtWidgets import QLabel
+            self._desc_label = QLabel("")
+            self._desc_label.setObjectName("CardSubValue")
+            self._outer.addWidget(self._desc_label)
+        self._desc_label.setText(text)
+        self._desc_label.setVisible(bool(text))
+
     def add_widget(self, widget: QWidget) -> None:
         """Append a widget to the card's content area."""
         self._content.addWidget(widget)

@@ -101,6 +101,7 @@ class DashboardPage(QWidget):
         gauge = CircularGauge()
         gauge.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         gauge.setFixedHeight(120)
+        gauge.set_label(title)
 
         chart = MiniChart(max_value=100, color="#4f8cff")
         chart.setFixedHeight(50)
@@ -263,8 +264,14 @@ class DashboardPage(QWidget):
         self._cpu_card._chart.add_value(pct)
         self._cpu_card.set_value(f"{pct:.1f}%")
         freq = cpu.get("freq_mhz")
+        cores = cpu.get("core_count", 1)
+        threads = cpu.get("thread_count", 1)
         if freq:
-            self._cpu_card.set_sub_value(f"{freq:.0f} MHz")
+            self._cpu_card.set_sub_value(
+                f"{cores}C/{threads}T  ·  {freq:.0f} MHz"
+            )
+        else:
+            self._cpu_card.set_sub_value(f"{cores}C/{threads}T")
 
     def _update_memory(self, mem: dict) -> None:
         pct = mem.get("percent", 0.0)
@@ -273,9 +280,12 @@ class DashboardPage(QWidget):
         self._ram_card._chart.add_value(pct)
         used = mem.get("used", 0)
         total = mem.get("total", 0)
+        available = mem.get("available", 0)
         if total:
             self._ram_card.set_value(f"{bytes_to_human(used)}")
-            self._ram_card.set_sub_value(f"of {bytes_to_human(total)}  ({pct:.1f}%)")
+            self._ram_card.set_sub_value(
+                f"of {bytes_to_human(total)}  —  {bytes_to_human(available)} free"
+            )
 
     def _update_disk(self, disk: dict) -> None:
         partitions = disk.get("partitions", [])
@@ -347,8 +357,12 @@ class DashboardPage(QWidget):
             self._battery_card._status_label.setText("No battery detected")
 
     def _update_uptime(self, uptime_seconds: float, mem: dict, cpu: dict) -> None:
-        self._uptime_card._uptime_label.setText(f"Uptime: {format_uptime(uptime_seconds)}")
+        self._uptime_card.set_value(format_uptime(uptime_seconds))
         load = cpu.get("load_avg", (0.0, 0.0, 0.0))
+        self._uptime_card.set_sub_value(
+            f"Load avg: {load[0]:.2f}  {load[1]:.2f}  {load[2]:.2f}"
+        )
+        self._uptime_card._uptime_label.setText(f"Uptime: {format_uptime(uptime_seconds)}")
         self._uptime_card._load_label.setText(
             f"Load avg: {load[0]:.2f}  {load[1]:.2f}  {load[2]:.2f}"
         )

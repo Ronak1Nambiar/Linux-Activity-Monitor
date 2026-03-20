@@ -11,13 +11,13 @@ _CONFIG_DIR = Path.home() / ".config" / "linux-monitor"
 _CONFIG_FILE = _CONFIG_DIR / "config.json"
 
 _VALID_THEMES = {"dark", "light"}
-_VALID_INTERVALS = {1, 2, 5}
+_VALID_INTERVALS = {0.5, 1, 2, 5}
 
 
 @dataclass
 class AppConfig:
     theme: str = "dark"
-    refresh_interval: int = 1
+    refresh_interval: float = 1
     window_width: int = 1200
     window_height: int = 800
 
