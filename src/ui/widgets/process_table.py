@@ -121,6 +121,15 @@ class ProcessTable(QTableView):
         self._proxy.setFilterRegularExpression(text)
 
     def update_processes(self, processes: list[dict]) -> None:
+        # Save current sort column/order so we can restore after repopulating
+        header = self.horizontalHeader()
+        sort_col = header.sortIndicatorSection()
+        sort_order = header.sortIndicatorOrder()
+
+        # Temporarily disable sorting while populating to avoid re-sorting on
+        # every insertRow and to prevent index corruption.
+        self.setSortingEnabled(False)
+
         self._model.setRowCount(0)
         for proc in processes:
             cpu = proc.get("cpu_percent", 0.0)
@@ -171,3 +180,7 @@ class ProcessTable(QTableView):
             self._model.appendRow(
                 [pid_item, name_item, user_item, cpu_item, ram_pct_item, ram_item, status_item, threads_item]
             )
+
+        # Re-enable sorting and restore the previous sort indicator
+        self.setSortingEnabled(True)
+        self.sortByColumn(sort_col, sort_order)
