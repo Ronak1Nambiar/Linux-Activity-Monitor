@@ -121,6 +121,14 @@ def _collect_system_info() -> dict:
     except Exception:
         info["total_swap"] = 0
     info["gpus"] = _get_gpu_info()
+    import time as _time
+    try:
+        boot_ts = psutil.boot_time()
+        import datetime
+        boot_dt = datetime.datetime.fromtimestamp(boot_ts)
+        info["boot_time"] = boot_dt.strftime("%Y-%m-%d %H:%M:%S")
+    except Exception:
+        info["boot_time"] = "—"
     return info
 
 
@@ -189,6 +197,8 @@ class HardwarePage(QWidget):
                 ("Kernel", info.get("kernel", "—")),
                 ("Architecture", info.get("architecture", "—")),
                 ("Uptime", "—"),
+                ("Boot Time", info.get("boot_time", "—")),
+                ("Python", info.get("python", "—")),
             ],
             uptime_slot=True,
         )
