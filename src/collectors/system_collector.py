@@ -178,6 +178,10 @@ class SystemCollector(BaseCollector):
                         "packets_recv": counters.packets_recv,
                     }
                 )
+            interfaces.sort(
+                key=lambda item: (item["bytes_sent_ps"] + item["bytes_recv_ps"], item["name"]),
+                reverse=True,
+            )
             self._prev_net_io = current
         except Exception:
             self._prev_net_io = None

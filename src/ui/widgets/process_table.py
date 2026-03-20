@@ -22,6 +22,7 @@ _COL_RAM_PCT = 4
 _COL_RAM = 5
 _COL_STATUS = 6
 _COL_THREADS = 7
+_ROLE_CMDLINE = Qt.ItemDataRole.UserRole + 1
 
 
 class _NumericItem(QStandardItem):
@@ -46,11 +47,15 @@ class _MultiColumnFilterProxy(QSortFilterProxyModel):
         if not pattern:
             return True
         model = self.sourceModel()
-        # search across: Name(1), User(2), PID(0)
+        # search across: Name(1), User(2), PID(0), command line metadata
         for col in (_COL_NAME, _COL_USER, _COL_PID):
             idx = model.index(source_row, col, source_parent)
             if pattern.lower() in (model.data(idx) or "").lower():
                 return True
+        cmdline_idx = model.index(source_row, _COL_NAME, source_parent)
+        cmdline = model.data(cmdline_idx, _ROLE_CMDLINE) or ""
+        if pattern.lower() in cmdline.lower():
+            return True
         return False
 
 
@@ -118,7 +123,7 @@ class ProcessTable(QTableView):
         return None
 
     def set_filter(self, text: str) -> None:
-        self._proxy.setFilterRegularExpression(text)
+        self._proxy.setFilterFixedString(text.strip())
 
     def update_processes(self, processes: list[dict]) -> None:
         self._model.setRowCount(0)
@@ -132,6 +137,7 @@ class ProcessTable(QTableView):
 
             name_item = QStandardItem(proc.get("name", ""))
             name_item.setEditable(False)
+            name_item.setData(proc.get("cmdline", ""), _ROLE_CMDLINE)
 
             user_item = QStandardItem(proc.get("username", ""))
             user_item.setEditable(False)
@@ -171,3 +177,4 @@ class ProcessTable(QTableView):
             self._model.appendRow(
                 [pid_item, name_item, user_item, cpu_item, ram_pct_item, ram_item, status_item, threads_item]
             )
+        self.selection_changed.emit(bool(self.selectionModel().selectedRows()))

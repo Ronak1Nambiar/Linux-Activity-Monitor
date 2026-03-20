@@ -387,7 +387,13 @@ class DashboardPage(QWidget):
         self._net_card._down_label.setText(f"↓  {speed_to_human(total_down)}")
         self._net_card._up_chart.add_value(total_up)
         self._net_card._down_chart.add_value(total_down)
-        iface = interfaces[0]["name"] if interfaces else ""
+        iface = ""
+        if interfaces:
+            top_iface = max(
+                interfaces,
+                key=lambda item: item.get("bytes_sent_ps", 0.0) + item.get("bytes_recv_ps", 0.0),
+            )
+            iface = top_iface.get("name", "")
         self._net_card.set_value(iface or "—")
 
     def _update_sensors(self, sensors: dict) -> None:
