@@ -39,6 +39,12 @@ class ProcessesPage(QWidget):
         self._count_label.setObjectName("CardSubValue")
         header_row.addWidget(self._count_label)
 
+        self._kill_btn = QPushButton("Kill Process")
+        self._kill_btn.setObjectName("ActionButton")
+        self._kill_btn.setEnabled(False)
+        self._kill_btn.clicked.connect(self._on_kill)
+        header_row.addWidget(self._kill_btn)
+
         layout.addLayout(header_row)
 
         # Search bar
@@ -63,6 +69,7 @@ class ProcessesPage(QWidget):
 
         # Table
         self._table = ProcessTable()
+        self._table.selection_changed.connect(self._kill_btn.setEnabled)
         layout.addWidget(self._table)
 
     # ------------------------------------------------------------------
@@ -71,6 +78,27 @@ class ProcessesPage(QWidget):
 
     def _on_filter_changed(self, text: str) -> None:
         self._table.set_filter(text)
+
+    def _on_kill(self) -> None:
+        pid = self._table.get_selected_pid()
+        if pid is None:
+            return
+        from PySide6.QtWidgets import QMessageBox
+
+        reply = QMessageBox.question(
+            self,
+            "Kill Process",
+            f"Send SIGTERM to process {pid}?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            import os
+            import signal
+
+            try:
+                os.kill(pid, signal.SIGTERM)
+            except (ProcessLookupError, PermissionError) as e:
+                QMessageBox.warning(self, "Error", f"Could not kill process {pid}:\n{e}")
 
     def update_processes(self, processes: list[dict]) -> None:
         self._table.update_processes(processes)
