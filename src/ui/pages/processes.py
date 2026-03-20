@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QFileDialog,
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QMessageBox,
     QPushButton,
     QVBoxLayout,
     QWidget,
@@ -38,6 +40,11 @@ class ProcessesPage(QWidget):
         self._count_label = QLabel("")
         self._count_label.setObjectName("CardSubValue")
         header_row.addWidget(self._count_label)
+
+        self._export_csv_btn = QPushButton("Export CSV")
+        self._export_csv_btn.setObjectName("ActionButton")
+        self._export_csv_btn.clicked.connect(self._on_export_csv)
+        header_row.addWidget(self._export_csv_btn)
 
         self._kill_btn = QPushButton("Kill Process")
         self._kill_btn.setObjectName("ActionButton")
@@ -78,6 +85,48 @@ class ProcessesPage(QWidget):
 
     def _on_filter_changed(self, text: str) -> None:
         self._table.set_filter(text)
+
+    def _on_export_csv(self) -> None:
+        import csv
+        from datetime import datetime
+
+        default_name = f"processes_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Export Processes to CSV",
+            default_name,
+            "CSV Files (*.csv)",
+        )
+        if not path:
+            return
+
+        try:
+            table = self._table
+            proxy = table.model()
+            col_count = proxy.columnCount()
+            # Header row from the model
+            headers = [
+                proxy.headerData(c, Qt.Orientation.Horizontal)
+                for c in range(col_count)
+            ]
+
+            with open(path, "w", newline="", encoding="utf-8") as f:
+                writer = csv.writer(f)
+                writer.writerow(headers)
+                for row in range(proxy.rowCount()):
+                    row_data = [
+                        proxy.data(proxy.index(row, c)) or ""
+                        for c in range(col_count)
+                    ]
+                    writer.writerow(row_data)
+
+            QMessageBox.information(
+                self, "Export Successful", f"Processes exported to:\n{path}"
+            )
+        except Exception as e:
+            QMessageBox.warning(
+                self, "Export Failed", f"Could not export processes:\n{e}"
+            )
 
     def _on_kill(self) -> None:
         pid = self._table.get_selected_pid()
