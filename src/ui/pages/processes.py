@@ -50,7 +50,7 @@ class ProcessesPage(QWidget):
         # Search bar
         search_row = QHBoxLayout()
         self._search = QLineEdit()
-        self._search.setPlaceholderText("Search by name, user or PID…")
+        self._search.setPlaceholderText("Search by name, cmdline, user or PID…")
         self._search.setObjectName("SearchBar")
         self._search.textChanged.connect(self._on_filter_changed)
         search_row.addWidget(self._search)
@@ -97,6 +97,8 @@ class ProcessesPage(QWidget):
 
             try:
                 os.kill(pid, signal.SIGTERM)
+                self._table.clearSelection()
+                self._kill_btn.setEnabled(False)
             except (ProcessLookupError, PermissionError) as e:
                 QMessageBox.warning(self, "Error", f"Could not kill process {pid}:\n{e}")
 
