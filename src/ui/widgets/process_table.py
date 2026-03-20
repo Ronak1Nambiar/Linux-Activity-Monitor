@@ -152,17 +152,17 @@ class ProcessTable(QTableView):
             status_item = QStandardItem(proc.get("status", ""))
             status_item.setEditable(False)
             status_colors = {
-                "running": "#4ade80",  # green
-                "sleeping": "#8b8fa8",  # muted gray
-                "idle": "#8b8fa8",
-                "stopped": "#fbbf24",  # yellow
-                "zombie": "#f87171",  # red
-                "dead": "#f87171",
-                "disk-sleep": "#38bdf8",  # blue
-                "tracing-stop": "#fbbf24",
+                "running": "#2ecc71",
+                "sleeping": "#95a5a6",
+                "idle": "#95a5a6",
+                "stopped": "#f39c12",
+                "tracing-stop": "#f39c12",
+                "zombie": "#e74c3c",
+                "dead": "#e74c3c",
+                "disk-sleep": "#3498db",
             }
-            status_str = proc.get("status", "")
-            color = status_colors.get(status_str, "#9ca3b4")
+            status_str = str(proc.get("status", "")).lower()
+            color = status_colors.get(status_str, "#7f8c8d")
             status_item.setForeground(QColor(color))
 
             threads_item = _NumericItem(str(proc.get("threads", 0)), float(proc.get("threads", 0)))
