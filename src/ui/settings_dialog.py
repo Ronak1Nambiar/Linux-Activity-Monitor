@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
     QFormLayout,
     QLabel,
+    QSpinBox,
     QVBoxLayout,
     QWidget,
 )
@@ -57,6 +58,29 @@ class SettingsDialog(QDialog):
 
         layout.addLayout(form)
 
+        # ---- Alerts section ----
+        alerts_title = QLabel("Alerts")
+        alerts_title.setObjectName("PageTitle")
+        layout.addWidget(alerts_title)
+
+        alerts_form = QFormLayout()
+        alerts_form.setSpacing(12)
+        alerts_form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+
+        self._cpu_threshold_spin = QSpinBox()
+        self._cpu_threshold_spin.setRange(50, 99)
+        self._cpu_threshold_spin.setSuffix("%")
+        self._cpu_threshold_spin.setValue(self._config.cpu_alert_threshold)
+        alerts_form.addRow("CPU Alert Threshold:", self._cpu_threshold_spin)
+
+        self._mem_threshold_spin = QSpinBox()
+        self._mem_threshold_spin.setRange(50, 99)
+        self._mem_threshold_spin.setSuffix("%")
+        self._mem_threshold_spin.setValue(self._config.mem_alert_threshold)
+        alerts_form.addRow("Memory Alert Threshold:", self._mem_threshold_spin)
+
+        layout.addLayout(alerts_form)
+
         # Buttons
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
@@ -72,6 +96,8 @@ class SettingsDialog(QDialog):
 
         self._config.theme = theme
         self._config.refresh_interval = interval
+        self._config.cpu_alert_threshold = self._cpu_threshold_spin.value()
+        self._config.mem_alert_threshold = self._mem_threshold_spin.value()
         self._config.save()
         self.settings_changed.emit(self._config)
         self.accept()

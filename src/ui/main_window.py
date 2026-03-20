@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
+import time
+
 from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QIcon, QPixmap
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QMainWindow,
+    QMessageBox,
     QSizePolicy,
     QStackedWidget,
+    QSystemTrayIcon,
     QVBoxLayout,
     QWidget,
 )
@@ -35,7 +40,13 @@ class MainWindow(QMainWindow):
         self.resize(config.window_width, config.window_height)
         self.setMinimumSize(900, 600)
 
+        # Alert cooldown tracking (monotonic timestamps of last alert)
+        self._last_cpu_alert: float = 0.0
+        self._last_mem_alert: float = 0.0
+        self._alert_cooldown: float = 60.0  # seconds
+
         self._build_ui()
+        self._setup_tray_icon()
         self._start_collectors()
 
     # ------------------------------------------------------------------
@@ -120,6 +131,57 @@ class MainWindow(QMainWindow):
         return header
 
     # ------------------------------------------------------------------
+    # System tray
+    # ------------------------------------------------------------------
+
+    def _setup_tray_icon(self) -> None:
+        """Create a system tray icon if the platform supports it."""
+        self._tray_icon: QSystemTrayIcon | None = None
+        if QSystemTrayIcon.isSystemTrayAvailable():
+            # Create a simple coloured pixmap as the icon
+            pixmap = QPixmap(32, 32)
+            pixmap.fill(Qt.GlobalColor.darkCyan)
+            icon = QIcon(pixmap)
+            self._tray_icon = QSystemTrayIcon(icon, self)
+            self._tray_icon.setToolTip("Linux Activity Monitor")
+            self._tray_icon.show()
+
+    # ------------------------------------------------------------------
+    # Threshold alerts
+    # ------------------------------------------------------------------
+
+    def _check_alerts(self, data: dict) -> None:
+        """Compare CPU/memory values against configured thresholds and alert."""
+        now = time.monotonic()
+
+        cpu_pct = data.get("cpu", {}).get("percent", 0.0)
+        mem_pct = data.get("memory", {}).get("percent", 0.0)
+
+        if cpu_pct >= self._config.cpu_alert_threshold:
+            if now - self._last_cpu_alert >= self._alert_cooldown:
+                self._last_cpu_alert = now
+                self._show_alert(
+                    "High CPU Usage",
+                    f"CPU usage is at {cpu_pct:.1f}% (threshold: {self._config.cpu_alert_threshold}%).",
+                )
+
+        if mem_pct >= self._config.mem_alert_threshold:
+            if now - self._last_mem_alert >= self._alert_cooldown:
+                self._last_mem_alert = now
+                self._show_alert(
+                    "High Memory Usage",
+                    f"Memory usage is at {mem_pct:.1f}% (threshold: {self._config.mem_alert_threshold}%).",
+                )
+
+    def _show_alert(self, title: str, message: str) -> None:
+        """Show an alert via system tray notification or fallback QMessageBox."""
+        if self._tray_icon is not None and self._tray_icon.supportsMessages():
+            self._tray_icon.showMessage(title, message, QSystemTrayIcon.MessageIcon.Warning, 5000)
+        else:
+            # Non-blocking fallback using QTimer.singleShot
+            QTimer.singleShot(0, lambda: QMessageBox.warning(self, title, message))
+
+    # ------------------------------------------------------------------
     # Collectors
     # ------------------------------------------------------------------
 
@@ -150,6 +212,7 @@ class MainWindow(QMainWindow):
         self._storage.update_data(data)
         self._network.update_data(data)
         self._hardware.update_data(data)
+        self._check_alerts(data)
 
     def _on_process_data(self, processes: list) -> None:
         self._processes.update_processes(processes)
