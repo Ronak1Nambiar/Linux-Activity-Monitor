@@ -2,26 +2,33 @@
 
 from __future__ import annotations
 
+from collections import deque
+
 from PySide6.QtCore import Qt, QSortFilterProxyModel, Signal
-from PySide6.QtGui import QColor, QStandardItem, QStandardItemModel
+from PySide6.QtGui import QColor, QPen, QPainter, QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QHeaderView,
+    QStyledItemDelegate,
+    QStyleOptionViewItem,
     QTableView,
     QWidget,
 )
 
 from src.utils.formatting import bytes_to_human
 
-_HEADERS = ["PID", "Name", "User", "CPU %", "RAM %", "RAM", "Status", "Threads"]
+_HEADERS = ["PID", "Name", "User", "CPU %", "CPU History", "RAM %", "RAM", "Status", "Threads"]
 _COL_PID = 0
 _COL_NAME = 1
 _COL_USER = 2
 _COL_CPU = 3
-_COL_RAM_PCT = 4
-_COL_RAM = 5
-_COL_STATUS = 6
-_COL_THREADS = 7
+_COL_CPU_HIST = 4
+_COL_RAM_PCT = 5
+_COL_RAM = 6
+_COL_STATUS = 7
+_COL_THREADS = 8
+
+_HISTORY_LEN = 30
 
 
 class _NumericItem(QStandardItem):
@@ -54,6 +61,53 @@ class _MultiColumnFilterProxy(QSortFilterProxyModel):
         return False
 
 
+class SparklineDelegate(QStyledItemDelegate):
+    """Delegate that paints a small green polyline sparkline in a cell.
+
+    The item's UserRole data should be a list of float values (CPU % samples).
+    """
+
+    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index) -> None:
+        # Draw the default background (selection highlight, alternating rows, etc.)
+        self.initStyleOption(option, index)
+        style = option.widget.style() if option.widget else None
+        if style:
+            style.drawPrimitive(style.PrimitiveElement.PE_PanelItemViewItem, option, painter, option.widget)
+
+        values = index.data(Qt.ItemDataRole.UserRole)
+        if not values or len(values) < 2:
+            return
+
+        rect = option.rect.adjusted(2, 2, -2, -2)
+        w = rect.width()
+        h = rect.height()
+        if w <= 0 or h <= 0:
+            return
+
+        # Fill dark background behind the sparkline
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.fillRect(rect, QColor("#1e1e2e"))
+
+        n = len(values)
+        top = 100.0  # CPU % is 0-100
+        step_x = w / (n - 1)
+
+        pen = QPen(QColor("#4ade80"), 1.0)
+        painter.setPen(pen)
+
+        prev_x = rect.x()
+        prev_y = rect.y() + h - (values[0] / top) * h
+        for i in range(1, n):
+            cur_x = rect.x() + i * step_x
+            cur_y = rect.y() + h - (min(values[i], top) / top) * h
+            painter.drawLine(int(prev_x), int(prev_y), int(cur_x), int(cur_y))
+            prev_x = cur_x
+            prev_y = cur_y
+
+        painter.restore()
+
+
 class ProcessTable(QTableView):
     """A read-only QTableView showing system processes."""
 
@@ -61,6 +115,9 @@ class ProcessTable(QTableView):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+
+        # Per-PID CPU history: {pid: deque([float, ...])}
+        self._cpu_history: dict[int, deque[float]] = {}
 
         self._model = QStandardItemModel(0, len(_HEADERS))
         self._model.setHorizontalHeaderLabels(_HEADERS)
@@ -91,9 +148,14 @@ class ProcessTable(QTableView):
         self.setColumnWidth(_COL_NAME, 180)
         self.setColumnWidth(_COL_USER, 110)
         self.setColumnWidth(_COL_CPU, 70)
+        self.setColumnWidth(_COL_CPU_HIST, 120)
         self.setColumnWidth(_COL_RAM_PCT, 70)
         self.setColumnWidth(_COL_RAM, 90)
         self.setColumnWidth(_COL_THREADS, 75)
+
+        # Register sparkline delegate on CPU History column
+        self._sparkline_delegate = SparklineDelegate(self)
+        self.setItemDelegateForColumn(_COL_CPU_HIST, self._sparkline_delegate)
 
     # ------------------------------------------------------------------
     # Public API
@@ -130,13 +192,29 @@ class ProcessTable(QTableView):
         # every insertRow and to prevent index corruption.
         self.setSortingEnabled(False)
 
+        # Update CPU history for each process
+        current_pids: set[int] = set()
+        for proc in processes:
+            pid = proc.get("pid", 0)
+            cpu = proc.get("cpu_percent", 0.0)
+            current_pids.add(pid)
+            if pid not in self._cpu_history:
+                self._cpu_history[pid] = deque([0.0] * _HISTORY_LEN, maxlen=_HISTORY_LEN)
+            self._cpu_history[pid].append(cpu)
+
+        # Remove stale PIDs
+        stale = set(self._cpu_history.keys()) - current_pids
+        for pid in stale:
+            del self._cpu_history[pid]
+
         self._model.setRowCount(0)
         for proc in processes:
             cpu = proc.get("cpu_percent", 0.0)
             ram_pct = proc.get("memory_percent", 0.0)
             ram_bytes = proc.get("memory_rss", 0)
+            pid = proc.get("pid", 0)
 
-            pid_item = _NumericItem(str(proc.get("pid", "")), float(proc.get("pid", 0)))
+            pid_item = _NumericItem(str(pid), float(pid))
             pid_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
 
             name_item = QStandardItem(proc.get("name", ""))
@@ -151,6 +229,13 @@ class ProcessTable(QTableView):
                 cpu_item.setForeground(QColor("#f87171"))
             elif cpu >= 5:
                 cpu_item.setForeground(QColor("#fbbf24"))
+
+            # CPU History sparkline item - store history as UserRole data
+            hist_item = QStandardItem()
+            hist_item.setEditable(False)
+            history = self._cpu_history.get(pid)
+            if history:
+                hist_item.setData(list(history), Qt.ItemDataRole.UserRole)
 
             ram_pct_item = _NumericItem(f"{ram_pct:.1f}", ram_pct)
             ram_pct_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
@@ -178,7 +263,7 @@ class ProcessTable(QTableView):
             threads_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
 
             self._model.appendRow(
-                [pid_item, name_item, user_item, cpu_item, ram_pct_item, ram_item, status_item, threads_item]
+                [pid_item, name_item, user_item, cpu_item, hist_item, ram_pct_item, ram_item, status_item, threads_item]
             )
 
         # Re-enable sorting and restore the previous sort indicator
