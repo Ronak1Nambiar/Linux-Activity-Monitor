@@ -39,14 +39,14 @@ class _PartitionCard(QFrame):
         device.setObjectName("CardTitle")
 
         # Usage bar
-        bar = QProgressBar()
-        bar.setRange(0, 100)
-        bar.setTextVisible(False)
-        bar.setFixedHeight(8)
+        self._bar = QProgressBar()
+        self._bar.setRange(0, 100)
+        self._bar.setTextVisible(False)
+        self._bar.setFixedHeight(8)
 
         pct = info.get("percent", 0.0)
-        bar.setValue(int(pct))
-        bar.setStyleSheet(
+        self._bar.setValue(int(pct))
+        self._bar.setStyleSheet(
             f"QProgressBar::chunk {{ background: {color_for_percent(pct)}; border-radius: 4px; }}"
         )
 
@@ -55,26 +55,40 @@ class _PartitionCard(QFrame):
         total = info.get("total", 0)
         free = info.get("free", 0)
         size_row = QHBoxLayout()
-        used_label = QLabel(f"Used: {bytes_to_human(used)}")
-        used_label.setObjectName("CardSubValue")
-        free_label = QLabel(f"Free: {bytes_to_human(free)}")
-        free_label.setObjectName("CardSubValue")
+        self._used_label = QLabel(f"Used: {bytes_to_human(used)}")
+        self._used_label.setObjectName("CardSubValue")
+        self._free_label = QLabel(f"Free: {bytes_to_human(free)}")
+        self._free_label.setObjectName("CardSubValue")
         total_label = QLabel(f"Total: {bytes_to_human(total)}")
         total_label.setObjectName("CardSubValue")
-        size_row.addWidget(used_label)
+        size_row.addWidget(self._used_label)
         size_row.addStretch()
-        size_row.addWidget(free_label)
+        size_row.addWidget(self._free_label)
         size_row.addStretch()
         size_row.addWidget(total_label)
 
-        pct_label = QLabel(f"{pct:.1f}% used")
-        pct_label.setObjectName("CardSubValue")
+        self._pct_label = QLabel(f"{pct:.1f}% used")
+        self._pct_label.setObjectName("CardSubValue")
 
         layout.addWidget(title)
         layout.addWidget(device)
-        layout.addWidget(bar)
-        layout.addWidget(pct_label)
+        layout.addWidget(self._bar)
+        layout.addWidget(self._pct_label)
         layout.addLayout(size_row)
+
+    def update_data(self, info: dict) -> None:
+        """Update the dynamic labels and progress bar with fresh partition data."""
+        pct = info.get("percent", 0.0)
+        used = info.get("used", 0)
+        free = info.get("free", 0)
+
+        self._bar.setValue(int(pct))
+        self._bar.setStyleSheet(
+            f"QProgressBar::chunk {{ background: {color_for_percent(pct)}; border-radius: 4px; }}"
+        )
+        self._pct_label.setText(f"{pct:.1f}% used")
+        self._used_label.setText(f"Used: {bytes_to_human(used)}")
+        self._free_label.setText(f"Free: {bytes_to_human(free)}")
 
 
 class StoragePage(QWidget):
@@ -83,6 +97,7 @@ class StoragePage(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._built_partitions: list[str] = []
+        self._partition_cards: dict[str, _PartitionCard] = {}
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -162,13 +177,22 @@ class StoragePage(QWidget):
         mountpoints = [p["mountpoint"] for p in partitions]
         if mountpoints != self._built_partitions:
             self._built_partitions = mountpoints
-            # Clear
+            # Clear existing widgets and card dict
             while self._partitions_layout.count():
                 item = self._partitions_layout.takeAt(0)
                 if item.widget():
                     item.widget().deleteLater()
+            self._partition_cards = {}
             for p in partitions:
-                self._partitions_layout.addWidget(_PartitionCard(p))
+                card = _PartitionCard(p)
+                self._partition_cards[p["mountpoint"]] = card
+                self._partitions_layout.addWidget(card)
+
+        # Always update dynamic data on all existing cards
+        for p in partitions:
+            mp = p["mountpoint"]
+            if mp in self._partition_cards:
+                self._partition_cards[mp].update_data(p)
 
         r = io.get("read_bytes_ps", 0.0)
         w = io.get("write_bytes_ps", 0.0)

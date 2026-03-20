@@ -33,6 +33,9 @@ QScrollBar::handle:vertical {
     border-radius: 3px;
     min-height: 30px;
 }
+QScrollBar::handle:vertical:hover {
+    background: #4f8cff;
+}
 QScrollBar::add-line:vertical,
 QScrollBar::sub-line:vertical {
     height: 0px;
@@ -115,9 +118,12 @@ QPushButton#SidebarButton:hover {
     color: #c8cae6;
 }
 QPushButton#SidebarButton:checked {
-    background: #252840;
-    color: #ffffff;
+    background: rgba(79, 140, 255, 0.15);
+    color: #4f8cff;
     font-weight: 600;
+    border-left: 3px solid #4f8cff;
+    border-radius: 0 8px 8px 0;
+    padding-left: 9px;
 }
 QPushButton#SidebarButton:pressed {
     background: #2a2d4e;
@@ -237,6 +243,7 @@ QTableView::item {
     padding: 6px 10px;
     color: #c8cae6;
     border: none;
+    min-height: 28px;
 }
 QTableView::item:selected {
     background-color: #2a2d4e;
@@ -307,6 +314,13 @@ QDialogButtonBox QPushButton:hover {
 }
 QDialogButtonBox QPushButton:pressed {
     background: #3a6be0;
+}
+
+/* ---- Battery label ---- */
+QLabel#BatteryLabel {
+    font-size: 28px;
+    font-weight: 700;
+    color: #4ade80;
 }
 
 /* ---- Tooltip ---- */

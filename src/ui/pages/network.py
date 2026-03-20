@@ -42,6 +42,9 @@ class _InterfaceCard(QFrame):
         self._total_label = QLabel("Total: sent 0 B / recv 0 B")
         self._total_label.setObjectName("HintLabel")
 
+        self._packets_label = QLabel("Packets: — sent / — recv")
+        self._packets_label.setObjectName("HintLabel")
+
         charts_layout = QHBoxLayout()
         charts_layout.setSpacing(12)
 
@@ -69,6 +72,7 @@ class _InterfaceCard(QFrame):
         layout.addWidget(self._down_label)
         layout.addLayout(charts_layout)
         layout.addWidget(self._total_label)
+        layout.addWidget(self._packets_label)
 
     def update_data(self, info: dict) -> None:
         up = info.get("bytes_sent_ps", 0.0)
@@ -82,6 +86,9 @@ class _InterfaceCard(QFrame):
         self._total_label.setText(
             f"Session total  ↑ {bytes_to_human(sent)}  ↓ {bytes_to_human(recv)}"
         )
+        pkts_sent = info.get("packets_sent", 0)
+        pkts_recv = info.get("packets_recv", 0)
+        self._packets_label.setText(f"Packets  ↑ {pkts_sent:,}  ↓ {pkts_recv:,}")
 
 
 class NetworkPage(QWidget):

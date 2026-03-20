@@ -174,6 +174,8 @@ class SystemCollector(BaseCollector):
                         "bytes_recv_ps": max(0.0, recv_ps),
                         "total_sent": counters.bytes_sent,
                         "total_recv": counters.bytes_recv,
+                        "packets_sent": counters.packets_sent,
+                        "packets_recv": counters.packets_recv,
                     }
                 )
             self._prev_net_io = current
