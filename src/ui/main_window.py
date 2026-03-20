@@ -254,6 +254,8 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event) -> None:  # noqa: N802
         self._stop_collectors()
+        if self._tray_icon is not None:
+            self._tray_icon.hide()
         # Save window geometry
         self._config.window_width = self.width()
         self._config.window_height = self.height()
