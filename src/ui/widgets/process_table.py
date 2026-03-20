@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, QSortFilterProxyModel
+from PySide6.QtCore import Qt, QSortFilterProxyModel, Signal
 from PySide6.QtGui import QColor, QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -57,6 +57,8 @@ class _MultiColumnFilterProxy(QSortFilterProxyModel):
 class ProcessTable(QTableView):
     """A read-only QTableView showing system processes."""
 
+    selection_changed = Signal(bool)  # True if a row is selected
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
 
@@ -97,6 +99,24 @@ class ProcessTable(QTableView):
     # Public API
     # ------------------------------------------------------------------
 
+    def currentChanged(self, current, previous):  # noqa: N802
+        super().currentChanged(current, previous)
+        self.selection_changed.emit(current.isValid())
+
+    def get_selected_pid(self) -> int | None:
+        indexes = self.selectionModel().selectedRows()
+        if not indexes:
+            return None
+        proxy_idx = indexes[0]
+        source_idx = self._proxy.mapToSource(proxy_idx)
+        pid_item = self._model.item(source_idx.row(), _COL_PID)
+        if pid_item:
+            try:
+                return int(pid_item.text())
+            except ValueError:
+                return None
+        return None
+
     def set_filter(self, text: str) -> None:
         self._proxy.setFilterRegularExpression(text)
 
@@ -131,6 +151,19 @@ class ProcessTable(QTableView):
 
             status_item = QStandardItem(proc.get("status", ""))
             status_item.setEditable(False)
+            status_colors = {
+                "running": "#4ade80",  # green
+                "sleeping": "#8b8fa8",  # muted gray
+                "idle": "#8b8fa8",
+                "stopped": "#fbbf24",  # yellow
+                "zombie": "#f87171",  # red
+                "dead": "#f87171",
+                "disk-sleep": "#38bdf8",  # blue
+                "tracing-stop": "#fbbf24",
+            }
+            status_str = proc.get("status", "")
+            color = status_colors.get(status_str, "#9ca3b4")
+            status_item.setForeground(QColor(color))
 
             threads_item = _NumericItem(str(proc.get("threads", 0)), float(proc.get("threads", 0)))
             threads_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)

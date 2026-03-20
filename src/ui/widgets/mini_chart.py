@@ -83,8 +83,14 @@ class MiniChart(QWidget):
         # Filled area
         path = QPainterPath()
         path.moveTo(0.0, float(h))
-        for x, y in points:
-            path.lineTo(x, y)
+        path.lineTo(points[0][0], points[0][1])
+        n_pts = len(points)
+        for i in range(1, n_pts):
+            x0, y0 = points[i - 1]
+            x1, y1 = points[i]
+            cp1x = x0 + (x1 - x0) / 3.0
+            cp2x = x0 + 2.0 * (x1 - x0) / 3.0
+            path.cubicTo(cp1x, y0, cp2x, y1, x1, y1)
         path.lineTo(float(w), float(h))
         path.closeSubpath()
 
@@ -96,11 +102,17 @@ class MiniChart(QWidget):
         gradient.setColorAt(1.0, transparent)
         painter.fillPath(path, gradient)
 
-        # Line
+        # Smooth line using cubic bezier curves
         line = QPainterPath()
         line.moveTo(points[0][0], points[0][1])
-        for x, y in points[1:]:
-            line.lineTo(x, y)
+        n_pts = len(points)
+        for i in range(1, n_pts):
+            x0, y0 = points[i - 1]
+            x1, y1 = points[i]
+            # Control points at 1/3 and 2/3 of the x distance
+            cp1x = x0 + (x1 - x0) / 3.0
+            cp2x = x0 + 2.0 * (x1 - x0) / 3.0
+            line.cubicTo(cp1x, y0, cp2x, y1, x1, y1)
         pen = QPen(self.base_color, 1.5, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin)
         painter.setPen(pen)
         painter.drawPath(line)
