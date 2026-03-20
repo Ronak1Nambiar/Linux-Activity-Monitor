@@ -44,7 +44,7 @@ class ProcessesPage(QWidget):
         # Search bar
         search_row = QHBoxLayout()
         self._search = QLineEdit()
-        self._search.setPlaceholderText("Filter by name…")
+        self._search.setPlaceholderText("Search by name, user or PID…")
         self._search.setObjectName("SearchBar")
         self._search.textChanged.connect(self._on_filter_changed)
         search_row.addWidget(self._search)
